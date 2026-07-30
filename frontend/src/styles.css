@@ -301,6 +301,35 @@ input:focus-visible {
   border-color: var(--accent);
 }
 
+/* Otomatik acilan proje notlari kapatildiginda butonun yerini gostermek icin
+   kisa bir nabiz. Kendini 2,6 sn sonra kapatiyor (iki tur). */
+.info-button-hint {
+  border-color: var(--accent);
+  animation: info-hint 1.3s ease-out 2;
+}
+
+@keyframes info-hint {
+  0% {
+    box-shadow: 0 0 0 0 rgba(37, 99, 235, 0.5);
+    transform: scale(1);
+  }
+  45% {
+    transform: scale(1.14);
+  }
+  100% {
+    box-shadow: 0 0 0 13px rgba(37, 99, 235, 0);
+    transform: scale(1);
+  }
+}
+
+/* Hareket hassasiyeti olan kullanicilar icin: nabiz yerine sabit bir halka. */
+@media (prefers-reduced-motion: reduce) {
+  .info-button-hint {
+    animation: none;
+    box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.35);
+  }
+}
+
 /* ------------------------------------------------------------------- modal */
 
 .modal-backdrop {

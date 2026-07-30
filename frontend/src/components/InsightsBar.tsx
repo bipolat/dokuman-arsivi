@@ -1,7 +1,10 @@
-import { useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { reindexContent } from '../api'
 import type { InsightsResponse, ReindexResponse } from '../types'
 import { InfoModal } from './InfoModal'
+
+/** Proje notlarının bir kez otomatik açıldığını hatırlayan anahtar. */
+const INFO_SEEN_KEY = 'docarchive.infoSeen'
 
 /**
  * Ölçüm olmadan "duplicate azaldı mı, arama iyileşti mi?" sorusuna cevap veremeyiz.
@@ -18,6 +21,52 @@ export function InsightsBar({
   const [result, setResult] = useState<ReindexResponse | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [infoOpen, setInfoOpen] = useState(false)
+  const [autoOpened, setAutoOpened] = useState(false)
+  const [hintButton, setHintButton] = useState(false)
+  const autoOpenChecked = useRef(false)
+
+  // İlk ziyarette proje notlarını bir kez kendiliğinden aç.
+  // Göstergeler gelmeden açmıyoruz: şerit henüz render edilmemiş olurdu,
+  // modal kapandığında vurgulanacak buton da ekranda olmazdı.
+  useEffect(() => {
+    if (!insights || autoOpenChecked.current) return
+    autoOpenChecked.current = true
+
+    let seen = true
+    try {
+      seen = localStorage.getItem(INFO_SEEN_KEY) === '1'
+    } catch {
+      // Gizli sekme / depolama kapalı: otomatik açmıyoruz ki her yenilemede tekrarlamasın.
+      seen = true
+    }
+
+    if (!seen) {
+      setInfoOpen(true)
+      setAutoOpened(true)
+    }
+  }, [insights])
+
+  // Vurgu kendini kapatıyor; animasyon iki tur (2 x 1,3 sn) sürüyor.
+  useEffect(() => {
+    if (!hintButton) return
+    const timer = setTimeout(() => setHintButton(false), 2600)
+    return () => clearTimeout(timer)
+  }, [hintButton])
+
+  function closeInfo() {
+    setInfoOpen(false)
+    // Vurgu yalnızca otomatik açılan modal kapatıldığında: kullanıcı butona kendisi
+    // tıkladıysa yerini zaten biliyor, tekrar işaret etmek gürültü olur.
+    if (autoOpened) {
+      setAutoOpened(false)
+      setHintButton(true)
+      try {
+        localStorage.setItem(INFO_SEEN_KEY, '1')
+      } catch {
+        // Yazılamadıysa sorun değil: en kötü durumda bir sonraki ziyarette tekrar açılır.
+      }
+    }
+  }
 
   if (!insights) return null
 
@@ -67,7 +116,7 @@ export function InsightsBar({
         {/* Satırın en sağı: proje notları, riskler ve iyileştirme fikirleri */}
         <button
           type="button"
-          className="info-button"
+          className={`info-button ${hintButton ? 'info-button-hint' : ''}`}
           title="Proje notları, alınan riskler ve iyileştirme fikirleri"
           aria-label="Proje notları"
           onClick={() => setInfoOpen(true)}
@@ -76,7 +125,7 @@ export function InsightsBar({
         </button>
       </div>
 
-      {infoOpen && <InfoModal onClose={() => setInfoOpen(false)} />}
+      {infoOpen && <InfoModal onClose={closeInfo} />}
 
       {error && <p className="feedback feedback-error">{error}</p>}
 
