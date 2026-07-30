@@ -67,9 +67,25 @@ if ($project) {
     # Gecici klasore cekip icerigi koke tasiyoruz: git clone dolu bir klasore
     # dogrudan cekemez, boylece kokte kurulum.bat gibi dosyalar olsa da calisir.
     $temp = Join-Path $env:TEMP ('clone-' + [guid]::NewGuid().ToString('N'))
+    # Otomatik calisan bir betikte kimlik istemi ekrani beklemeye sokar; kapatiyoruz.
+    $env:GIT_TERMINAL_PROMPT = '0'
     try {
-        git clone --depth 1 $RepoUrl $temp 2>&1 | ForEach-Object { Write-Info $_ }
-        if ($LASTEXITCODE -ne 0) { throw "git clone basarisiz (cikis kodu $LASTEXITCODE)" }
+        # git bilgi mesajlarini da stderr'e yazar. ErrorActionPreference='Stop' bunlari
+        # istisnaya cevirip gercek hata satirini gizliyor; o yuzden cikis kodunu kendimiz kontrol ediyoruz.
+        $prevEap = $ErrorActionPreference
+        $ErrorActionPreference = 'Continue'
+        $cloneOutput = git clone --depth 1 $RepoUrl $temp 2>&1
+        $cloneExit = $LASTEXITCODE
+        $ErrorActionPreference = $prevEap
+
+        $cloneOutput | ForEach-Object { Write-Info $_ }
+        if ($cloneExit -ne 0) {
+            $reason = $cloneOutput |
+                      Where-Object { $_ -match 'fatal|error|denied|not found|Authentication' } |
+                      Select-Object -Last 1
+            if (-not $reason) { $reason = "cikis kodu $cloneExit" }
+            throw $reason
+        }
 
         Get-ChildItem -Path $temp -Force | ForEach-Object {
             $target = Join-Path $root $_.Name
