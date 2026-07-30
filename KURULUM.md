@@ -1,236 +1,146 @@
 # Kurulum ve Ayağa Kaldırma
 
-Bu dosya **bulunduğu klasörü proje kökü kabul eder.** Bilgisayarda nereye koyarsanız
-(`C:\projeler\arsiv`, `D:\work\dms`, masaüstü — fark etmez) adımlar o klasöre göre çalışır.
-Sabit yol yazılmadı.
+İki dosya bu işi yapıyor:
 
-## Ne yapar
+| Dosya | Görevi |
+|---|---|
+| **`kurulum.bat`** | Gereksinimleri kontrol eder, eksikleri **winget ile kurar**, sonra `kurulum.ps1`'i çağırır |
+| **`kurulum.ps1`** | Klasörleri kontrol eder, repoyu çeker, backend + frontend'i ayağa kaldırır |
 
-```
-1) backend/ ve frontend/ klasörleri var mı?  →  yoksa oluştur
-2) Repoları çek                              →  ŞİMDİLİK ATLANDI (aşağıda yeri hazır)
-3) Kapı kontrolü: içlerinde gerçek proje var mı?
-4) Varsa → backend'i ayağa kaldır  (http://localhost:5099)
-5) Varsa → frontend'i ayağa kaldır (http://localhost:5173)
-```
+İkisi de **bulunduğu klasörü proje kökü kabul eder.** Bilgisayarda nereye koyarsanız
+(`C:\projeler\arsiv`, `D:\work`, masaüstü — fark etmez) o klasöre göre çalışır. Sabit yol yok.
 
-3. adım bilinçli bir kapı: 2. adım atlandığı için klasörler **boş** kalmış olabilir. Boş klasörü
-ayağa kaldırmaya çalışmak anlamsız hata verir, o yüzden önce içerik kontrol edilip anlaşılır bir
-mesajla duruluyor.
+## Kullanım
 
-## Gereksinimler
+`kurulum.bat` dosyasına **çift tıklayın.** Hepsi bu.
 
-| | Sürüm | Kontrol |
-|---|---|---|
-| .NET SDK | 8.0+ (bu projede 10.0 RC ile geliştirildi) | `dotnet --version` |
-| Node.js | 20+ (bu projede 25 ile geliştirildi) | `node --version` |
-| Git | 2.x (2. adım açıldığında gerekir) | `git --version` |
-
----
-
-## Tek seferde çalıştır
-
-**Bu dosyanın bulunduğu klasörde** PowerShell açın (klasöre sağ tık → *Terminalde aç*), aşağıdaki
-bloğu olduğu gibi yapıştırın.
-
-> Dilerseniz aynı bloğu bu klasöre `kurulum.ps1` olarak kaydedip
-> `powershell -ExecutionPolicy Bypass -File .\kurulum.ps1` ile çalıştırabilirsiniz —
-> script olarak da, yapıştırma olarak da aynı şekilde çalışır.
+Ya da terminalden:
 
 ```powershell
-# --- 0) Proje kökünü bul (script olarak da, yapistirma olarak da calisir) ---
-if ($PSScriptRoot) { $root = $PSScriptRoot } else { $root = (Get-Location).Path }
-$backend  = Join-Path $root 'backend'
-$frontend = Join-Path $root 'frontend'
-Write-Host "Proje koku : $root" -ForegroundColor Cyan
+.\kurulum.bat
+```
 
-# --- 1) Klasorler yoksa olustur ---
-foreach ($dir in @($backend, $frontend)) {
-    if (Test-Path $dir) {
-        Write-Host "  [var]      $(Split-Path $dir -Leaf)"
-    } else {
-        New-Item -ItemType Directory -Path $dir | Out-Null
-        Write-Host "  [olustu]   $(Split-Path $dir -Leaf)" -ForegroundColor Yellow
-    }
-}
+Sadece PowerShell tarafını çalıştırmak isterseniz (gereksinimler zaten kuruluysa):
 
-# --- 2) Repolari cek --- SIMDILIK ATLANDI ---
-# Kullanmaya baslarken asagidaki iki satirin basindaki # isaretini kaldirin ve URL'leri yazin.
-# Klasor bos degilse git clone hata verir; o yuzden bos kontrolu eklendi.
-#
-# if (-not (Get-ChildItem $backend  -Force | Select-Object -First 1)) { git clone <BACKEND_REPO_URL>  $backend  }
-# if (-not (Get-ChildItem $frontend -Force | Select-Object -First 1)) { git clone <FRONTEND_REPO_URL> $frontend }
-Write-Host "  [atlandi]  repo cekme adimi" -ForegroundColor DarkGray
-
-# --- 3) Kapi kontrolu: iceride gercek proje var mi? ---
-$csproj  = Get-ChildItem -Path $backend -Filter *.csproj -Recurse -ErrorAction SilentlyContinue |
-           Select-Object -First 1
-$pkgJson = Join-Path $frontend 'package.json'
-
-$hazir = $true
-if ($null -eq $csproj) {
-    Write-Warning "backend/ icinde .csproj bulunamadi."
-    $hazir = $false
-}
-if (-not (Test-Path $pkgJson)) {
-    Write-Warning "frontend/ icinde package.json bulunamadi."
-    $hazir = $false
-}
-
-if (-not $hazir) {
-    Write-Host ""
-    Write-Host "Klasorler hazir ama icleri bos. Ayaga kaldirilacak proje yok." -ForegroundColor Red
-    Write-Host "Yapilacak: 2. adimdaki git clone satirlarini acip repo URL'lerini yazin," -ForegroundColor Red
-    Write-Host "ya da proje dosyalarini bu klasorlere elle kopyalayin, sonra tekrar calistirin." -ForegroundColor Red
-} else {
-    Write-Host ""
-    Write-Host "Proje bulundu:" -ForegroundColor Green
-    Write-Host "  backend  : $($csproj.FullName)"
-    Write-Host "  frontend : $pkgJson"
-
-    # --- 4) Backend ---
-    Write-Host ""
-    Write-Host "Backend ayaga kaldiriliyor (http://localhost:5099) ..." -ForegroundColor Cyan
-    $backendCmd = "Set-Location '$root'; dotnet run --project '$($csproj.FullName)' --no-launch-profile --urls http://localhost:5099"
-    Start-Process powershell -ArgumentList '-NoExit', '-Command', $backendCmd
-
-    # Health endpoint cevap verene kadar bekle (ilk calistirmada demo verisi uretilir, biraz surer)
-    $up = $false
-    for ($i = 1; $i -le 90; $i++) {
-        Start-Sleep -Seconds 1
-        try {
-            $h = Invoke-RestMethod 'http://localhost:5099/api/health' -TimeoutSec 2
-            if ($h.status -eq 'ok') {
-                Write-Host "  backend hazir - $($h.indexedDocuments) dokuman indekslendi ($i sn)" -ForegroundColor Green
-                $up = $true
-                break
-            }
-        } catch { }
-    }
-    if (-not $up) {
-        Write-Warning "Backend 90 saniyede cevap vermedi. Acilan pencerede hata mesaji olabilir."
-    }
-
-    # --- 5) Frontend ---
-    Write-Host ""
-    if (-not (Test-Path (Join-Path $frontend 'node_modules'))) {
-        Write-Host "npm install calisiyor (ilk kurulumda birkac dakika surebilir) ..." -ForegroundColor Cyan
-        Push-Location $frontend
-        npm install
-        Pop-Location
-    } else {
-        Write-Host "node_modules mevcut, npm install atlandi."
-    }
-
-    Write-Host "Frontend ayaga kaldiriliyor (http://localhost:5173) ..." -ForegroundColor Cyan
-    Start-Process powershell -ArgumentList '-NoExit', '-Command', "Set-Location '$frontend'; npm run dev"
-    Start-Sleep -Seconds 6
-
-    # Vite 5173 mesgulse 5174'e kayar; ikisini de dene
-    $uiPort = $null
-    foreach ($port in 5173, 5174, 5175) {
-        try {
-            $r = Invoke-WebRequest "http://localhost:$port/" -UseBasicParsing -TimeoutSec 2
-            if ($r.StatusCode -eq 200) { $uiPort = $port; break }
-        } catch { }
-    }
-
-    Write-Host ""
-    Write-Host "=================================================" -ForegroundColor Green
-    if ($uiPort) {
-        Write-Host " Arayuz  : http://localhost:$uiPort" -ForegroundColor Green
-    } else {
-        Write-Host " Arayuz  : frontend penceresindeki adrese bakin" -ForegroundColor Yellow
-    }
-    Write-Host " API     : http://localhost:5099/api/health" -ForegroundColor Green
-    Write-Host "=================================================" -ForegroundColor Green
-    Write-Host "Durdurmak icin acilan iki PowerShell penceresinde Ctrl+C."
-}
+```powershell
+powershell -ExecutionPolicy Bypass -File .\kurulum.ps1
 ```
 
 ---
 
-## Adım adım ne oluyor
+## Akış
 
-### 1. Klasör kontrolü
+```
+kurulum.bat
+   │
+   ├─ [1/3] Gereksinim kontrolü      dotnet · node · git  →  eksikse winget ile kur
+   ├─ [2/3] Doğrulama                PATH yenile, tekrar kontrol et
+   └─ [3/3] kurulum.ps1'i çağır
+              │
+              ├─ 1) backend/ ve frontend/ klasörleri var mı, içlerinde proje var mı?
+              ├─ 2) Yoksa repoyu çek
+              ├─ 3) KAPI: proje gerçekten var mı? — yoksa anlaşılır mesajla dur
+              ├─ 4) Backend'i ayağa kaldır    → http://localhost:5099
+              └─ 5) Frontend'i ayağa kaldır   → http://localhost:5173
+```
 
-`backend/` ve `frontend/` yoksa oluşturulur, varsa dokunulmaz. Mevcut bir kuruluma zarar vermez.
+### 1. Gereksinimler (`kurulum.bat`)
 
-### 2. Repo çekme — şimdilik atlandı
+| Araç | winget paketi | Neden |
+|---|---|---|
+| .NET SDK | `Microsoft.DotNet.SDK.10` | Proje `net10.0` hedefliyor |
+| Node.js | `OpenJS.NodeJS.LTS` | Frontend build/dev sunucusu |
+| Git | `Git.Git` | Repo çekimi |
 
-Blokta yeri hazır, `#` ile kapatılmış. Açmak için iki satırın başındaki `#` kaldırılıp repo
-URL'leri yazılır. Klasör boş değilse `git clone` hata verdiği için boşluk kontrolü de eklendi —
-yani ikinci çalıştırmada üzerine yazmaya çalışmaz.
+Her araç için önce `where` ile varlık kontrolü yapılır, varsa sürümü yazdırılır, yoksa winget ile
+sessiz kurulum denenir. **UAC izin penceresi çıkabilir, onaylamanız gerekir.**
+
+Kurulum yapıldıysa PATH bu oturuma yeniden yüklenir — yoksa yeni kurulan araç "bulunamadı"
+görünürdü. Buna rağmen bulunamazsa script *"bu pencereyi kapatıp tekrar çalıştırın"* diyerek durur.
+
+winget yoksa (Windows 10'un eski sürümleri) otomatik kurulum yapılamaz; script bunu söyler ve
+indirme adreslerini verir.
+
+### 2. Klasör ve repo (`kurulum.ps1`)
+
+Klasörün **varlığı yeterli sayılmıyor**, içinde gerçek proje aranıyor:
+
+- `backend/` altında (alt klasörler dahil) herhangi bir `.csproj`
+- `frontend/package.json`
+
+Proje yoksa repo çekilir. Repo geçici bir klasöre çekilip içeriği köke taşınır — çünkü `git clone`
+dolu bir klasöre doğrudan çekemez, bu yöntemle kökte `kurulum.bat` gibi dosyalar olsa bile çalışır.
+
+Farklı bir adresten çekmek için:
+
+```powershell
+powershell -File .\kurulum.ps1 -RepoUrl https://github.com/<hesap>/<repo>.git
+```
 
 ### 3. Kapı kontrolü
 
-2. adım atlandığı için klasörler boş kalabilir. Bu yüzden ayağa kaldırmadan önce:
+Bu adım bilinçli: 2. adım başarısız olduysa klasörler **boş** kalmış olabilir. Boş klasörü ayağa
+kaldırmaya çalışmak anlaşılmaz hata verir. Onun yerine `backend/` ve `frontend/` oluşturulur,
+durum açıkça yazılır ve çıkılır:
 
-- `backend/` içinde **herhangi bir** `.csproj` aranır (alt klasörler dahil)
-- `frontend/package.json` aranır
+```
+AYAGA KALDIRILAMADI - klasorler hazir ama iceri bos.
+```
 
-İkisinden biri yoksa süreç **anlaşılır bir mesajla durur**. `.csproj` alt klasörlerde de aranıyor,
-çünkü repo `backend/DocArchive.Api/DocArchive.Api.csproj` gibi bir yapıda gelebilir.
+### 4-5. Sunucular
 
-### 4. Backend
+Backend ayrı bir pencerede 5099 portunda başlar; `/api/health` cevap verene kadar (en fazla 90 sn)
+beklenir. **İlk çalıştırmada** demo verisi otomatik oluşur (60 doküman + gerçek
+PDF/DOCX/XLSX/ODT/RTF/HTML dosyaları), o yüzden ilk açılış birkaç saniye uzun sürer.
 
-Ayrı bir PowerShell penceresinde `dotnet run` ile 5099 portunda başlar. Sonra
-`/api/health` endpoint'i cevap verene kadar (en fazla 90 sn) beklenir.
+Frontend'de `node_modules` yoksa `npm install` çalışır (varsa atlanır), sonra ayrı bir pencerede
+`npm run dev` başlar. Port 5173 doluysa Vite kendiliğinden 5174'e kayar; script üç portu yoklayıp
+doğru adresi yazdırır.
 
-> **İlk çalıştırmada** demo verisi otomatik oluşur: 60 doküman + gerçek PDF/DOCX/XLSX/ODT/RTF/HTML
-> dosyaları. Bu yüzden ilk açılış sonrakilerden birkaç saniye uzun sürer.
-
-### 5. Frontend
-
-`node_modules` yoksa `npm install` çalışır (varsa atlanır), sonra ayrı bir pencerede `npm run dev`
-başlar. Port 5173 doluysa Vite kendiliğinden 5174'e kayar; script üç portu da yoklayıp doğru
-adresi yazdırır.
-
-**5099 portu önemli:** frontend'in `vite.config.ts` dosyası `/api` isteklerini
-`http://localhost:5099` adresine proxy'liyor. Backend başka bir portta çalışırsa arayüz boş görünür.
+> **5099 portu önemli:** `frontend/vite.config.ts`, `/api` isteklerini `http://localhost:5099`
+> adresine proxy'liyor. Backend başka portta çalışırsa arayüz boş görünür. Portu değiştirirseniz
+> ikisini birlikte değiştirin (`-ApiPort` parametresi + vite config).
 
 ---
 
 ## Doğrulama
-
-Her şey yolundaysa:
 
 ```powershell
 # API cevap veriyor mu
 Invoke-RestMethod 'http://localhost:5099/api/health'
 # beklenen: status=ok, indexedDocuments=60
 
-# Arama calisiyor mu (Turkce katlama testi)
+# Türkçe katlama çalışıyor mu
 (Invoke-RestMethod 'http://localhost:5099/api/documents?q=sozlesme').total
-# beklenen: 20+ sonuc
+# beklenen: 20+
 
-# Tam senaryo testi (23 senaryo) - API ayaktayken
+# 23 senaryoluk tam test (API ayaktayken)
 powershell -ExecutionPolicy Bypass -File .\scripts\smoke-test.ps1
 ```
 
-Arayüzde görmesi gerekenler: üstte gösterge şeridi, arama kutusu, filtreler, doküman listesi,
-sağda yükleme paneli, gösterge şeridinin en sağında **i** butonu (proje notları).
+Arayüzde görmeniz gerekenler: gösterge şeridi, arama kutusu, filtreler, doküman listesi, sağda
+yükleme paneli, gösterge şeridinin **en sağında `i` butonu** (proje notları popup'ı).
 
 ---
 
 ## Sorun giderme
 
-| Belirti | Sebep / çözüm |
+| Belirti | Çözüm |
 |---|---|
-| `dotnet: command not found` | .NET SDK kurulu değil → https://dotnet.microsoft.com/download |
-| Backend açılıyor, sonra kapanıyor | 5099 portu meşgul. `Get-NetTCPConnection -LocalPort 5099` ile bakın, ya da script'teki `--urls` değerini ve `vite.config.ts`'teki proxy hedefini birlikte değiştirin |
-| Arayüz açılıyor ama liste boş | Backend 5099'da değil. `Invoke-RestMethod http://localhost:5099/api/health` ile doğrulayın |
+| `.bat` açılıp hemen kapanıyor | Terminalden çalıştırın, hata mesajı görünür: `.\kurulum.bat` |
+| Kurulum sonrası "araç bulunamadı" | PATH henüz geçerli değil. Pencereyi kapatıp `.bat`'ı tekrar çalıştırın |
+| winget bulunamadı | Microsoft Store → "App Installer" kurun, ya da araçları elle indirin |
+| Backend açılıp kapanıyor | 5099 meşgul: `Get-NetTCPConnection -LocalPort 5099` |
+| Arayüz açılıyor ama liste boş | Backend 5099'da değil → `Invoke-RestMethod http://localhost:5099/api/health` |
 | `npm install` hata veriyor | `frontend/node_modules` ve `package-lock.json` silinip tekrar denenir |
-| Demo verisini sıfırlamak | `backend/DocArchive.Api/storage` klasörünü silin, backend'i yeniden başlatın. Klasör kilitli derse editörü (VS Code vb.) kapatıp tekrar deneyin |
-| Türkçe karakterler bozuk görünüyor | Windows PowerShell 5.1 için: `[Console]::OutputEncoding = [System.Text.Encoding]::UTF8` |
-| Script'i çalıştıramıyorum | `powershell -ExecutionPolicy Bypass -File .\kurulum.ps1` |
+| Demo verisini sıfırlama | `backend/DocArchive.Api/storage` klasörünü silin, backend'i yeniden başlatın. Kilitli derse editörü kapatıp tekrar deneyin |
+| Türkçe karakterler bozuk | `[Console]::OutputEncoding = [System.Text.Encoding]::UTF8` |
 
 ## Notlar
 
-- Script **idempotent**: birden fazla çalıştırılabilir. Var olan klasörlere, mevcut
+- Her iki script **idempotent**: birden fazla çalıştırılabilir. Var olan klasörlere, mevcut
   `node_modules`'a ve oluşmuş demo verisine dokunmaz.
-- Backend ve frontend **ayrı pencerelerde** açılır (`-NoExit`), böylece logları görebilir ve
-  `Ctrl+C` ile durdurabilirsiniz.
-- Tek süreçte çalıştırmak isterseniz: `cd frontend; npm run build` → build çıktısı API'nin
-  `wwwroot` klasörüne gider, sonra yalnızca **http://localhost:5099** yeterli olur.
-- 2. adım (repo çekme) doldurulduğunda bu dosyada başka bir değişiklik gerekmez.
+- Sunucular **ayrı pencerelerde** (`-NoExit`) açılır; logları görebilir, `Ctrl+C` ile durdurabilirsiniz.
+- Tek süreçte çalıştırmak isterseniz: `cd frontend; npm run build` → çıktı API'nin `wwwroot`
+  klasörüne gider, sonra yalnızca **http://localhost:5099** yeterlidir.
+- Sunucu başlatmadan sadece klasör/repo hazırlığı için: `.\kurulum.ps1 -SkipRun`
