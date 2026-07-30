@@ -74,18 +74,36 @@ echo.
 echo [3/3] Klasorler, repo ve sunucular...
 echo.
 
+set "URLFILE=%TEMP%\dokuman-arsivi-url.txt"
+if exist "%URLFILE%" del "%URLFILE%" >nul 2>&1
+
 powershell -NoProfile -ExecutionPolicy Bypass -File "%~dp0kurulum.ps1"
 set "PSEXIT=%errorlevel%"
 
 echo.
 if not "%PSEXIT%"=="0" (
     echo Kurulum betigi hata ile bitti. Yukaridaki mesajlara bakin.
-) else (
-    echo Islem tamamlandi.
+    echo.
+    pause
+    exit /b %PSEXIT%
 )
+
+rem Adresi ps1 yaziyor: port tespiti orada yapiliyor, burada tahmin edilmiyor.
+if exist "%URLFILE%" (
+    set /p APPURL=<"%URLFILE%"
+    del "%URLFILE%" >nul 2>&1
+    echo Tarayici aciliyor: !APPURL!
+    start "" "!APPURL!"
+) else (
+    echo Arayuz portu tespit edilemedi, tarayici acilmadi.
+    echo Frontend penceresindeki adrese bakin.
+)
+
+echo.
+echo Islem tamamlandi.
 echo.
 pause
-exit /b %PSEXIT%
+exit /b 0
 
 
 rem ---------------------------------------------------------------

@@ -35,13 +35,26 @@ kurulum.bat
    │
    ├─ [1/3] Gereksinim kontrolü      dotnet · node · git  →  eksikse winget ile kur
    ├─ [2/3] Doğrulama                PATH yenile, tekrar kontrol et
-   └─ [3/3] kurulum.ps1'i çağır
-              │
-              ├─ 1) backend/ ve frontend/ klasörleri var mı, içlerinde proje var mı?
-              ├─ 2) Yoksa repoyu çek
-              ├─ 3) KAPI: proje gerçekten var mı? — yoksa anlaşılır mesajla dur
-              ├─ 4) Backend'i ayağa kaldır    → http://localhost:5099
-              └─ 5) Frontend'i ayağa kaldır   → http://localhost:5173
+   ├─ [3/3] kurulum.ps1'i çağır
+   │          │
+   │          ├─ 1) backend/ ve frontend/ klasörleri var mı, içlerinde proje var mı?
+   │          ├─ 2) Yoksa repoyu çek
+   │          ├─ 3) KAPI: proje gerçekten var mı? — yoksa anlaşılır mesajla dur
+   │          ├─ 4) Backend'i ayağa kaldır    → http://localhost:5099
+   │          ├─ 5) Frontend'i ayağa kaldır   → http://localhost:5173
+   │          └─ Tespit edilen adresi geçici bir dosyaya yaz
+   │
+   └─ Adresi okuyup TARAYICIYI AÇ
+```
+
+Adres tespiti `kurulum.ps1` tarafında yapılıyor (Vite 5173 doluysa 5174'e kayabiliyor),
+`.bat` port tahmin etmiyor — ps1'in yazdığı adresi okuyup açıyor. Böylece port bilgisi tek
+kaynaktan geliyor.
+
+`kurulum.ps1`'i tek başına çalıştırıp tarayıcının da açılmasını isterseniz:
+
+```powershell
+powershell -ExecutionPolicy Bypass -File .\kurulum.ps1 -OpenBrowser
 ```
 
 ### 1. Gereksinimler (`kurulum.bat`)
@@ -70,6 +83,9 @@ Klasörün **varlığı yeterli sayılmıyor**, içinde gerçek proje aranıyor:
 
 Proje yoksa repo çekilir. Repo geçici bir klasöre çekilip içeriği köke taşınır — çünkü `git clone`
 dolu bir klasöre doğrudan çekemez, bu yöntemle kökte `kurulum.bat` gibi dosyalar olsa bile çalışır.
+
+Varsayılan kaynak: **https://github.com/bipolat/dokuman-arsivi** (public — kimlik doğrulaması
+gerekmez, herkes çekebilir).
 
 Farklı bir adresten çekmek için:
 

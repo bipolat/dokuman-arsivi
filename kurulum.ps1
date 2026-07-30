@@ -9,7 +9,10 @@ param(
     [string]$RepoUrl = 'https://github.com/bipolat/dokuman-arsivi.git',
     [int]$ApiPort = 5099,
     # Sadece klasor/repo hazirligi yapip sunuculari baslatmamak icin.
-    [switch]$SkipRun
+    [switch]$SkipRun,
+    # Betik tek basina calistirildiginda tarayiciyi da acsin.
+    # kurulum.bat bunu kullanmaz; adresi dosyadan okuyup kendisi acar.
+    [switch]$OpenBrowser
 )
 
 $ErrorActionPreference = 'Stop'
@@ -200,4 +203,18 @@ if ($uiPort) {
 Write-Host "  API    : http://localhost:$ApiPort/api/health" -ForegroundColor Green
 Write-Host '=========================================================' -ForegroundColor Green
 Write-Host 'Durdurmak icin acilan iki PowerShell penceresinde Ctrl+C.'
+
+# Tespit edilen adresi kurulum.bat'in okuyabilecegi yere yaz.
+# Port tespiti burada yapildigi icin adresi tek kaynaktan uretiyoruz;
+# .bat kendi basina port tahmin etmeye calismiyor.
+$urlFile = Join-Path $env:TEMP 'dokuman-arsivi-url.txt'
+if (Test-Path $urlFile) { Remove-Item $urlFile -Force -ErrorAction SilentlyContinue }
+if ($uiPort) {
+    Set-Content -Path $urlFile -Value "http://localhost:$uiPort" -Encoding Ascii
+    if ($OpenBrowser) {
+        Write-Info 'Tarayici aciliyor...'
+        Start-Process "http://localhost:$uiPort"
+    }
+}
+
 exit 0
