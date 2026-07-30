@@ -1,0 +1,20 @@
+bin/
+obj/
+node_modules/
+dist/
+
+# Uygulama tarafından üretilen çalışma zamanı verisi (demo DB, sidecar, bloblar)
+backend/DocArchive.Api/storage*/
+
+# Frontend build çıktısı API'nin wwwroot'una yazılır
+backend/DocArchive.Api/wwwroot/
+
+.vs/
+.idea/
+*.user
+
+# Kisisel/teslim dokumanlari - repoya girmez
+*.docx
+*.doc
+*.pdf
+!backend/DocArchive.Api/storage*/**
